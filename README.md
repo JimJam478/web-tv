@@ -10,6 +10,8 @@ screen and sits on your TV's app shelf like any other app. Build as many as you 
 - **Full screen**, with no browser bars. Links stay inside the app, logins stay signed in, and videos can go full screen.
 - **Remote control cursor.** The arrows move a pointer and OK clicks under it, so sites made for a mouse work too.
   Push the pointer past the top or bottom edge to scroll.
+- **YouTube, made for the TV** (when the app's `url` is YouTube): videos open full screen, Back leaves them, and
+  playback stays at 720p in the format the TV decodes in hardware, so the picture is smooth and the pointer quick.
 - **Desktop layout.** Pages are laid out 1920 px wide instead of as a phone or tablet, so sites show their full
   desktop page at the TV's real resolution.
 - **Ad blocking:**
@@ -167,6 +169,10 @@ Limits:
   ad that slips through, usually on a video opened straight from a link, is muted and skipped in about a second.
   YouTube changes this often. When ads come back, `git pull` and rebuild. YouTube videos embedded in other sites,
   youtube.com/tv and sponsor segments inside videos aren't covered.
+- **YouTube can hold a video back** for about as long as the ad it would have shown (often 15 to 30 seconds of
+  black screen). Its server simply doesn't send the video yet, so the app can't skip that wait.
+- **A YouTube video opened straight from a link** (rather than from inside YouTube) can stutter: the app's
+  720p/H.264 settings arrive after that first player has started.
 - **Video ads in other sites' players** aren't blocked.
 
 ## Troubleshooting
@@ -206,7 +212,8 @@ another way. You're responsible for what you build and what you point it at.
   - `MainActivity.java`: the web view, cursor and blocking
   - `Blocklist.java`: domain matching
   - `ListUpdater.java`: list download, used by both the app and `update-blocklist.sh`
-  - `app/assets/youtube.js`: YouTube video ad removal, injected into every page (does nothing on other sites)
+  - `app/assets/youtube.js`: YouTube ad removal and TV playback settings, injected into every page (does nothing on
+    other sites)
 - `tools/Art.java` draws the icon and banner. `tools/BlocklistCheck.java` is a quick check of domain matching:
 
   ```sh
