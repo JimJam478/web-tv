@@ -10,6 +10,8 @@ screen and sits on your TV's app shelf like any other app. Build as many as you 
 - **Full screen**, with no browser bars. Links stay inside the app, logins stay signed in, and videos can go full screen.
 - **Remote control cursor.** The arrows move a pointer and OK clicks under it, so sites made for a mouse work too.
   Push the pointer past the top or bottom edge to scroll.
+- **Remote control for videos.** In a full-screen video the arrows skip 10 seconds and OK plays or pauses, as in the
+  YouTube TV app.
 - **YouTube, made for the TV** (when the app's `url` is YouTube): videos open full screen, Back leaves them, and
   playback stays at 720p in the format the TV decodes in hardware, so the picture is smooth and the pointer quick.
 - **Desktop layout.** Pages are laid out 1920 px wide instead of as a phone or tablet, so sites show their full
@@ -129,6 +131,14 @@ The app now appears in the TV's app list. Pin it to the home row from there.
 
 The pointer hides after 4 seconds without movement, so it never sits on top of a video.
 
+In a full-screen video, while the pointer is hidden:
+
+| Remote button | What it does |
+| --- | --- |
+| Left / Right | Back / forward 10 seconds |
+| OK | Play or pause |
+| Up / Down | Bring the pointer back, to reach the player's own buttons (it hides again after 4 seconds) |
+
 ## More apps, updates and changes
 
 - **Another site:** make another config file and build it. Each `id` installs as its own app:
@@ -174,6 +184,8 @@ Limits:
 - **A YouTube video opened straight from a link** (rather than from inside YouTube) can stutter: the app's
   720p/H.264 settings arrive after that first player has started.
 - **Video ads in other sites' players** aren't blocked.
+- **Remote control for videos** works on videos in the page itself, not ones embedded from another site (a
+  YouTube player inside a news article, for example): there the arrows move the pointer as usual.
 
 ## Troubleshooting
 

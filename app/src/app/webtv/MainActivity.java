@@ -50,6 +50,10 @@ public class MainActivity extends Activity {
     /** Home is YouTube: desktop site, and each video opens full screen as in the YouTube TV app. */
     private static final boolean YOUTUBE =
             HOME_HOST != null && (HOME_HOST.equals("youtube.com") || HOME_HOST.endsWith(".youtube.com"));
+    /** Finds the page's biggest video (in the full-screen element if any) and runs the given body on it as v. */
+    private static final String ON_VIDEO = "(function(){var r=document.fullscreenElement||document,"
+            + "vs=r.tagName=='VIDEO'?[r]:r.querySelectorAll('video'),v=null;for(var i=0;i<vs.length;i++)"
+            + "if(!v||vs[i].clientWidth*vs[i].clientHeight>v.clientWidth*v.clientHeight)v=vs[i];if(v){%s}})()";
 
     private FrameLayout root;
     private WebView web;
@@ -212,6 +216,7 @@ public class MainActivity extends Activity {
                 root.addView(view, root.indexOfChild(cursor), new FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
                 web.setVisibility(View.GONE);
+                cursor.setVisibility(View.INVISIBLE);   // so the arrows control the video straight away
             }
 
             @Override
@@ -246,6 +251,7 @@ public class MainActivity extends Activity {
             }
             return true;
         }
+        if (fullscreenVideo != null && cursor.getVisibility() != View.VISIBLE && videoKey(e)) return true;
         int dx = 0, dy = 0;
         switch (e.getKeyCode()) {
             case KeyEvent.KEYCODE_DPAD_LEFT: dx = -1; break;
@@ -266,6 +272,27 @@ public class MainActivity extends Activity {
         // Pushing past the top or bottom scrolls the page instead (not a full-screen video, which has nothing to scroll).
         if (fullscreenVideo == null && (y < 0 || y > maxY)) web.scrollBy(0, dy * step * 3);
         cursor.moveTo(Math.max(0, Math.min(x, maxX)), Math.max(0, Math.min(y, maxY)));
+        return true;
+    }
+
+    /**
+     * Full-screen video with the pointer hidden, as the YouTube TV app: left/right go back/forward 10 s, OK plays
+     * or pauses, up/down bring the pointer back to reach the player's own buttons. False for any other key.
+     */
+    private boolean videoKey(KeyEvent e) {
+        String body;
+        switch (e.getKeyCode()) {
+            case KeyEvent.KEYCODE_DPAD_LEFT: body = "v.currentTime=Math.max(0,v.currentTime-10)"; break;
+            case KeyEvent.KEYCODE_DPAD_RIGHT: body = "v.currentTime+=10"; break;
+            case KeyEvent.KEYCODE_DPAD_CENTER:
+            case KeyEvent.KEYCODE_ENTER: body = e.getRepeatCount() == 0 ? "v.paused?v.play():v.pause()" : ""; break;
+            case KeyEvent.KEYCODE_DPAD_UP:
+            case KeyEvent.KEYCODE_DPAD_DOWN: body = null; break;
+            default: return false;
+        }
+        if (e.getAction() != KeyEvent.ACTION_DOWN) return true;
+        if (body == null) cursor.moveTo(cursor.x, cursor.y);
+        else if (!body.isEmpty()) web.evaluateJavascript(String.format(ON_VIDEO, body), null);   // held OK: once
         return true;
     }
 
