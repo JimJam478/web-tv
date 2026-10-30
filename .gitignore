@@ -6,4 +6,6 @@ out/
 app.properties
 *.keystore
 local/
-app/assets/
+app/assets/hosts.txt
+app/assets/hide.css
+app/assets/*.new

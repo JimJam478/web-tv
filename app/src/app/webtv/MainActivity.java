@@ -36,7 +36,8 @@ import org.json.JSONObject;
 
 /**
  * Opens HOME full screen, signed in across launches, videos able to go full screen. Ads: ad/tracker hosts blocked,
- * pop-up windows and non-web links dropped, leftover ad boxes hidden. Holding Back goes home.
+ * pop-up windows and non-web links dropped, leftover ad boxes hidden, YouTube video ads stripped. Holding Back goes
+ * home.
  */
 public class MainActivity extends Activity {
     private static final String HOME = Config.URL;
@@ -63,6 +64,7 @@ public class MainActivity extends Activity {
             + "fit();if(!window.webtvFit){window.webtvFit=1;new MutationObserver(fit).observe(document.documentElement,"
             + "{childList:true,subtree:true,attributes:true,attributeFilter:['content']})}})()";
     private volatile String hideAds;   // script adding EasyList's hide rules to a page; null until loaded
+    private String youtubeAds;   // assets/youtube.js: strips YouTube's video ads, no-op on other sites
     private Thread blocklistLoader;
     private boolean clearHistoryOnLoad;
 
@@ -104,6 +106,11 @@ public class MainActivity extends Activity {
             }
         });
 
+        try {
+            youtubeAds = read(getAssets().open("youtube.js"));
+        } catch (IOException e) {
+            Log.e("WebTV", "youtube.js failed to load, YouTube ads not blocked", e);
+        }
         web = new WebView(this);
         blocklistLoader.start();   // after web exists: it posts to it when done
         WebSettings s = web.getSettings();
@@ -150,12 +157,14 @@ public class MainActivity extends Activity {
             public void onPageCommitVisible(WebView view, String url) {
                 view.evaluateJavascript(FIT_WIDTH, null);
                 if (hideAds != null) view.evaluateJavascript(hideAds, null);
+                if (youtubeAds != null) view.evaluateJavascript(youtubeAds, null);
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 view.evaluateJavascript(FIT_WIDTH, null);   // again: the page's own scripts may have reset it
                 if (hideAds != null) view.evaluateJavascript(hideAds, null);   // no-op if commit already added it
+                if (youtubeAds != null) view.evaluateJavascript(youtubeAds, null);   // same
                 if (clearHistoryOnLoad) {
                     clearHistoryOnLoad = false;
                     view.clearHistory();

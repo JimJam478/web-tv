@@ -17,6 +17,7 @@ screen and sits on your TV's app shelf like any other app. Build as many as you 
   - Pop-up windows and new tabs never open.
   - A page that tries to redirect you to an ad site stays where it is.
   - Leftover empty ad boxes are hidden.
+  - YouTube video ads are stripped before the player sees them, and any ad that still starts is skipped.
   - The lists update themselves weekly.
 - **A way out:** hold Back for a second to jump to the home page and clear history, so a misbehaving page can't trap
   you.
@@ -162,7 +163,11 @@ Limits:
   boxes stay. Ads can flash for a moment before they're hidden.
 - **No new windows at all:** sites that sign you in through a pop-up window (some "Sign in with…" buttons) won't work.
 - **New ad domains** appear daily. The weekly update keeps up with most of them, not all.
-- **Video ads inside players** (YouTube-style) aren't blocked.
+- **YouTube** (www.youtube.com): the app removes the ads from the player's data, the way uBlock Origin does. An
+  ad that slips through, usually on a video opened straight from a link, is muted and skipped in about a second.
+  YouTube changes this often. When ads come back, `git pull` and rebuild. YouTube videos embedded in other sites,
+  youtube.com/tv and sponsor segments inside videos aren't covered.
+- **Video ads in other sites' players** aren't blocked.
 
 ## Troubleshooting
 
@@ -201,6 +206,7 @@ another way. You're responsible for what you build and what you point it at.
   - `MainActivity.java`: the web view, cursor and blocking
   - `Blocklist.java`: domain matching
   - `ListUpdater.java`: list download, used by both the app and `update-blocklist.sh`
+  - `app/assets/youtube.js`: YouTube video ad removal, injected into every page (does nothing on other sites)
 - `tools/Art.java` draws the icon and banner. `tools/BlocklistCheck.java` is a quick check of domain matching:
 
   ```sh
