@@ -1,0 +1,9 @@
+# Build output
+out/
+*.apk
+*.idsig
+# Yours, never commit: your site, your signing key, your pictures, downloaded ad lists
+app.properties
+*.keystore
+local/
+app/assets/

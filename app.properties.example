@@ -1,0 +1,20 @@
+# Copy to app.properties, edit, then ./build.sh
+
+# Name on the TV's app shelf.
+name = Wikipedia
+
+# Page the app opens. Links stay inside the app.
+url = https://en.wikipedia.org/
+
+# Android app id: unique per app, so several site apps can be installed side by side.
+# Lowercase letters, digits and dots, e.g. com.yourname.wikipedia. Changing it later installs a second app.
+id = com.example.wikipedia
+
+# Optional: a picture for the icon and banner (PNG or JPEG). Without one, the name is drawn as text.
+# icon = local/my-logo.png
+# Optional: which square of the picture to use, "x y size" in pixels. Default: the centre.
+# icon_crop = 0 0 400
+
+# Optional: page width in CSS pixels. 1920 shows sites' desktop layout at the TV's real resolution;
+# 1280 makes everything 1.5x bigger, easier to read from far away.
+# page_width = 1920
