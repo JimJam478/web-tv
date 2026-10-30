@@ -13,12 +13,14 @@ import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.ServiceWorkerClient;
 import android.webkit.ServiceWorkerController;
+import android.webkit.ValueCallback;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebChromeClient;
@@ -36,13 +38,22 @@ import org.json.JSONObject;
 
 /**
  * Opens HOME full screen, signed in across launches, videos able to go full screen. Ads: ad/tracker hosts blocked,
- * pop-up windows and non-web links dropped, leftover ad boxes hidden. Holding Back goes home.
+ * pop-up windows and non-web links dropped, leftover ad boxes hidden, YouTube video ads stripped. Holding Back goes
+ * home.
  */
 public class MainActivity extends Activity {
     private static final String HOME = Config.URL;
     /** CSS pixels across the screen. The TV's own 2x density gives pages 960, a tablet layout; 1920 is desktop. */
     private static final int PAGE_WIDTH = Config.PAGE_WIDTH;
     private static final long UPDATE_EVERY_MS = 7L * 24 * 60 * 60 * 1000;
+    private static final String HOME_HOST = Uri.parse(HOME).getHost();
+    /** Home is YouTube: desktop site, and each video opens full screen as in the YouTube TV app. */
+    private static final boolean YOUTUBE =
+            HOME_HOST != null && (HOME_HOST.equals("youtube.com") || HOME_HOST.endsWith(".youtube.com"));
+    /** Finds the page's biggest video (in the full-screen element if any) and runs the given body on it as v. */
+    private static final String ON_VIDEO = "(function(){var r=document.fullscreenElement||document,"
+            + "vs=r.tagName=='VIDEO'?[r]:r.querySelectorAll('video'),v=null;for(var i=0;i<vs.length;i++)"
+            + "if(!v||vs[i].clientWidth*vs[i].clientHeight>v.clientWidth*v.clientHeight)v=vs[i];if(v){%s}})()";
 
     private FrameLayout root;
     private WebView web;
@@ -63,8 +74,10 @@ public class MainActivity extends Activity {
             + "fit();if(!window.webtvFit){window.webtvFit=1;new MutationObserver(fit).observe(document.documentElement,"
             + "{childList:true,subtree:true,attributes:true,attributeFilter:['content']})}})()";
     private volatile String hideAds;   // script adding EasyList's hide rules to a page; null until loaded
+    private String youtubeAds;   // assets/youtube.js: strips YouTube's video ads, no-op on other sites
     private Thread blocklistLoader;
     private boolean clearHistoryOnLoad;
+    private String fullscreenFor;   // YouTube video id the app is putting full screen, so it does so once
 
     @Override
     protected void onCreate(Bundle state) {
@@ -104,6 +117,11 @@ public class MainActivity extends Activity {
             }
         });
 
+        try {
+            youtubeAds = read(getAssets().open("youtube.js"));
+        } catch (IOException e) {
+            Log.e("WebTV", "youtube.js failed to load, YouTube ads not blocked", e);
+        }
         web = new WebView(this);
         blocklistLoader.start();   // after web exists: it posts to it when done
         WebSettings s = web.getSettings();
@@ -112,7 +130,8 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         // Desktop Chrome on Linux, same version: sites send desktop pages, and Google sign-in doesn't refuse "wv".
         // Opt-in: client hints still say Android WebView, and Cloudflare's check fails forever on the mismatch.
-        if (Config.DESKTOP_UA) {
+        // Always on for YouTube: its phone site plays 360p.
+        if (Config.DESKTOP_UA || YOUTUBE) {
             s.setUserAgentString(s.getUserAgentString().replaceFirst("\\([^)]*Android[^)]*\\)", "(X11; Linux x86_64)")
                     .replace(" Mobile", "").replace("; wv", "").replaceFirst(" Version/[0-9.]+", ""));
         }
@@ -146,16 +165,30 @@ public class MainActivity extends Activity {
                 return false;
             }
 
+            /** YouTube opens videos without loading a page, so this, not onPageStarted, sees each one. */
+            @Override
+            public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
+                if (!YOUTUBE) return;
+                String id = watchedVideo(url);
+                if (id == null) fullscreenFor = null;
+                else if (!id.equals(fullscreenFor)) {
+                    fullscreenFor = id;
+                    pressFullscreen(id, 60, 1000);
+                }
+            }
+
             @Override
             public void onPageCommitVisible(WebView view, String url) {
                 view.evaluateJavascript(FIT_WIDTH, null);
                 if (hideAds != null) view.evaluateJavascript(hideAds, null);
+                if (youtubeAds != null) view.evaluateJavascript(youtubeAds, null);
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 view.evaluateJavascript(FIT_WIDTH, null);   // again: the page's own scripts may have reset it
                 if (hideAds != null) view.evaluateJavascript(hideAds, null);   // no-op if commit already added it
+                if (youtubeAds != null) view.evaluateJavascript(youtubeAds, null);   // same
                 if (clearHistoryOnLoad) {
                     clearHistoryOnLoad = false;
                     view.clearHistory();
@@ -183,6 +216,7 @@ public class MainActivity extends Activity {
                 root.addView(view, root.indexOfChild(cursor), new FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
                 web.setVisibility(View.GONE);
+                cursor.setVisibility(View.INVISIBLE);   // so the arrows control the video straight away
             }
 
             @Override
@@ -209,6 +243,15 @@ public class MainActivity extends Activity {
     /** The remote's arrows move the cursor and OK clicks under it; every other key (Back, media keys) is unchanged. */
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
+        // In full screen the video's own view takes Back and only closes itself, so onBackPressed never ran.
+        if (fullscreenVideo != null && e.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            if (e.getAction() == KeyEvent.ACTION_UP) onBackPressed();
+            else if (e.getEventTime() - e.getDownTime() >= ViewConfiguration.getLongPressTimeout()) {
+                onKeyLongPress(KeyEvent.KEYCODE_BACK, e);   // leaves full screen: the release then goes unseen here
+            }
+            return true;
+        }
+        if (fullscreenVideo != null && cursor.getVisibility() != View.VISIBLE && videoKey(e)) return true;
         int dx = 0, dy = 0;
         switch (e.getKeyCode()) {
             case KeyEvent.KEYCODE_DPAD_LEFT: dx = -1; break;
@@ -230,6 +273,60 @@ public class MainActivity extends Activity {
         if (fullscreenVideo == null && (y < 0 || y > maxY)) web.scrollBy(0, dy * step * 3);
         cursor.moveTo(Math.max(0, Math.min(x, maxX)), Math.max(0, Math.min(y, maxY)));
         return true;
+    }
+
+    /**
+     * Full-screen video with the pointer hidden, as the YouTube TV app: left/right go back/forward 10 s, OK plays
+     * or pauses, up/down bring the pointer back to reach the player's own buttons. False for any other key.
+     */
+    private boolean videoKey(KeyEvent e) {
+        String body;
+        switch (e.getKeyCode()) {
+            case KeyEvent.KEYCODE_DPAD_LEFT: body = "v.currentTime=Math.max(0,v.currentTime-10)"; break;
+            case KeyEvent.KEYCODE_DPAD_RIGHT: body = "v.currentTime+=10"; break;
+            case KeyEvent.KEYCODE_DPAD_CENTER:
+            case KeyEvent.KEYCODE_ENTER: body = e.getRepeatCount() == 0 ? "v.paused?v.play():v.pause()" : ""; break;
+            case KeyEvent.KEYCODE_DPAD_UP:
+            case KeyEvent.KEYCODE_DPAD_DOWN: body = null; break;
+            default: return false;
+        }
+        if (e.getAction() != KeyEvent.ACTION_DOWN) return true;
+        if (body == null) cursor.moveTo(cursor.x, cursor.y);
+        else if (!body.isEmpty()) web.evaluateJavascript(String.format(ON_VIDEO, body), null);   // held OK: once
+        return true;
+    }
+
+    /** The YouTube video id if url is a watch page, else null. */
+    private static String watchedVideo(String url) {
+        Uri u = Uri.parse(url);
+        return "/watch".equals(u.getPath()) ? u.getQueryParameter("v") : null;
+    }
+
+    /**
+     * Presses YouTube's "f" shortcut once its video plays; a key from the app counts as the user's, which full screen
+     * needs. Pressed earlier, while the player loads, the presses pile up and the late ones close full screen again.
+     */
+    private void pressFullscreen(final String id, final int triesLeft, long delayMs) {
+        web.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (fullscreenVideo != null || triesLeft == 0 || !id.equals(watchedVideo(web.getUrl()))) return;
+                web.evaluateJavascript("(function(){var p=document.getElementById('movie_player');"
+                        + "return !!(p&&p.getPlayerState&&p.getPlayerState()==1)})()", new ValueCallback<String>() {
+                    @Override
+                    public void onReceiveValue(String playing) {
+                        boolean press = "true".equals(playing) && fullscreenVideo == null;
+                        if (press) {
+                            web.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_F));
+                            web.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_F));
+                        }
+                        // Full screen takes seconds to open: a second press before then would close it.
+                        // ponytail: polls each second for up to a minute (YouTube can hold a video back ~25 s).
+                        pressFullscreen(id, triesLeft - 1, press ? 5000 : 1000);
+                    }
+                });
+            }
+        }, delayMs);
     }
 
     /** A finger tap at the cursor: the page (or the video's own controls) can't tell it from a touch. */
@@ -297,8 +394,10 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (fullscreenVideo != null) web.getWebChromeClient().onHideCustomView();
-        else if (web.canGoBack()) web.goBack();
+        if (fullscreenVideo != null) {
+            web.getWebChromeClient().onHideCustomView();
+            if (YOUTUBE && web.canGoBack()) web.goBack();   // leaves the video too, as the YouTube TV app does
+        } else if (web.canGoBack()) web.goBack();
         else super.onBackPressed();
     }
 

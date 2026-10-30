@@ -10,6 +10,10 @@ screen and sits on your TV's app shelf like any other app. Build as many as you 
 - **Full screen**, with no browser bars. Links stay inside the app, logins stay signed in, and videos can go full screen.
 - **Remote control cursor.** The arrows move a pointer and OK clicks under it, so sites made for a mouse work too.
   Push the pointer past the top or bottom edge to scroll.
+- **Remote control for videos.** In a full-screen video the arrows skip 10 seconds and OK plays or pauses, as in the
+  YouTube TV app.
+- **YouTube, made for the TV** (when the app's `url` is YouTube): videos open full screen, Back leaves them, and
+  playback stays at 720p in the format the TV decodes in hardware, so the picture is smooth and the pointer quick.
 - **Desktop layout.** Pages are laid out 1920 px wide instead of as a phone or tablet, so sites show their full
   desktop page at the TV's real resolution.
 - **Ad blocking:**
@@ -17,6 +21,7 @@ screen and sits on your TV's app shelf like any other app. Build as many as you 
   - Pop-up windows and new tabs never open.
   - A page that tries to redirect you to an ad site stays where it is.
   - Leftover empty ad boxes are hidden.
+  - YouTube video ads are stripped before the player sees them, and any ad that still starts is skipped.
   - The lists update themselves weekly.
 - **A way out:** hold Back for a second to jump to the home page and clear history, so a misbehaving page can't trap
   you.
@@ -126,6 +131,14 @@ The app now appears in the TV's app list. Pin it to the home row from there.
 
 The pointer hides after 4 seconds without movement, so it never sits on top of a video.
 
+In a full-screen video, while the pointer is hidden:
+
+| Remote button | What it does |
+| --- | --- |
+| Left / Right | Back / forward 10 seconds |
+| OK | Play or pause |
+| Up / Down | Bring the pointer back, to reach the player's own buttons (it hides again after 4 seconds) |
+
 ## More apps, updates and changes
 
 - **Another site:** make another config file and build it. Each `id` installs as its own app:
@@ -162,7 +175,17 @@ Limits:
   boxes stay. Ads can flash for a moment before they're hidden.
 - **No new windows at all:** sites that sign you in through a pop-up window (some "Sign in with…" buttons) won't work.
 - **New ad domains** appear daily. The weekly update keeps up with most of them, not all.
-- **Video ads inside players** (YouTube-style) aren't blocked.
+- **YouTube** (www.youtube.com): the app removes the ads from the player's data, the way uBlock Origin does. An
+  ad that slips through, usually on a video opened straight from a link, is muted and skipped in about a second.
+  YouTube changes this often. When ads come back, `git pull` and rebuild. YouTube videos embedded in other sites,
+  youtube.com/tv and sponsor segments inside videos aren't covered.
+- **YouTube can hold a video back** for about as long as the ad it would have shown (often 15 to 30 seconds of
+  black screen). Its server simply doesn't send the video yet, so the app can't skip that wait.
+- **A YouTube video opened straight from a link** (rather than from inside YouTube) can stutter: the app's
+  720p/H.264 settings arrive after that first player has started.
+- **Video ads in other sites' players** aren't blocked.
+- **Remote control for videos** works on videos in the page itself, not ones embedded from another site (a
+  YouTube player inside a news article, for example): there the arrows move the pointer as usual.
 
 ## Troubleshooting
 
@@ -201,6 +224,8 @@ another way. You're responsible for what you build and what you point it at.
   - `MainActivity.java`: the web view, cursor and blocking
   - `Blocklist.java`: domain matching
   - `ListUpdater.java`: list download, used by both the app and `update-blocklist.sh`
+  - `app/assets/youtube.js`: YouTube ad removal and TV playback settings, injected into every page (does nothing on
+    other sites)
 - `tools/Art.java` draws the icon and banner. `tools/BlocklistCheck.java` is a quick check of domain matching:
 
   ```sh
