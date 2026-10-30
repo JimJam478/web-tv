@@ -111,8 +111,11 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
         // Desktop Chrome on Linux, same version: sites send desktop pages, and Google sign-in doesn't refuse "wv".
-        s.setUserAgentString(s.getUserAgentString().replaceFirst("\\([^)]*Android[^)]*\\)", "(X11; Linux x86_64)")
-                .replace(" Mobile", "").replace("; wv", "").replaceFirst(" Version/[0-9.]+", ""));
+        // Opt-in: client hints still say Android WebView, and Cloudflare's check fails forever on the mismatch.
+        if (Config.DESKTOP_UA) {
+            s.setUserAgentString(s.getUserAgentString().replaceFirst("\\([^)]*Android[^)]*\\)", "(X11; Linux x86_64)")
+                    .replace(" Mobile", "").replace("; wv", "").replaceFirst(" Version/[0-9.]+", ""));
+        }
         Log.d("WebTV", "user agent " + s.getUserAgentString());
         s.setUseWideViewPort(true);   // honor the page's viewport tag, which FIT_WIDTH sets to PAGE_WIDTH
         s.setLoadWithOverviewMode(true);   // then zoom out so that width fills the screen

@@ -10,8 +10,8 @@ screen and sits on your TV's app shelf like any other app. Build as many as you 
 - **Full screen**, with no browser bars. Links stay inside the app, logins stay signed in, and videos can go full screen.
 - **Remote control cursor.** The arrows move a pointer and OK clicks under it, so sites made for a mouse work too.
   Push the pointer past the top or bottom edge to scroll.
-- **Desktop layout.** Sites see a 1920 px wide desktop browser instead of a phone or tablet, so they send their
-  full desktop page at the TV's real resolution.
+- **Desktop layout.** Pages are laid out 1920 px wide instead of as a phone or tablet, so sites show their full
+  desktop page at the TV's real resolution.
 - **Ad blocking:**
   - Requests to about 275,000 known ad and tracker domains are refused.
   - Pop-up windows and new tabs never open.
@@ -95,6 +95,7 @@ id = com.yourname.wikipedia       # unique per app: lowercase letters, digits, d
 # icon = local/logo.png           # optional picture (PNG/JPEG) for the icon and banner
 # icon_crop = 0 0 400             # optional square of the picture: x y size, in pixels
 # page_width = 1920               # optional: 1280 makes sites 1.5x bigger, easier to read from the couch
+# desktop_ua = true               # optional: claim to be desktop Chrome (see Troubleshooting)
 ```
 
 Without an `icon`, the app's name is drawn as the banner and its initials as the icon. With one, the picture becomes
@@ -169,7 +170,12 @@ Limits:
 custom launcher: `adb shell am force-stop <launcher package>`, then press Home.
 
 **The site looks like a big phone or tablet layout.** Rebuild from the latest code, since desktop layout is on by
-default. If the text is too small from the couch, set `page_width = 1280`.
+default. If the text is too small from the couch, set `page_width = 1280`. If the site still sends its phone page, or
+Google sign-in says the browser isn't secure, set `desktop_ua = true`: the app then claims to be desktop Chrome.
+
+**Stuck on "Just a moment..." or "Performing security verification".** That's Cloudflare's bot check, and it never
+passes with `desktop_ua = true`: the web view still reports Android underneath, and the check sees the mismatch.
+Remove that line (or set it to `false`) and rebuild.
 
 **`adb connect` fails, or the device shows as `unauthorized`.** Check the TV for the *Allow USB debugging?* prompt. If
 it doesn't appear, turn USB debugging off and on again. Some TVs forget the authorization after switching input or
