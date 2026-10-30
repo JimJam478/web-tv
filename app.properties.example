@@ -18,3 +18,7 @@ id = com.example.wikipedia
 # Optional: page width in CSS pixels. 1920 shows sites' desktop layout at the TV's real resolution;
 # 1280 makes everything 1.5x bigger, easier to read from far away.
 # page_width = 1920
+
+# Optional: claim to be desktop Chrome, for sites that send a phone page or refuse Google sign-in otherwise.
+# Breaks Cloudflare's "Just a moment..." check, which then never passes. Default: false.
+# desktop_ua = true

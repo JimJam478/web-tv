@@ -13,12 +13,14 @@ get() {   # value of key $1 in the config: first "key = value" line, '#' lines i
 }
 NAME="$(get name)"; URL="$(get url)"; ID="$(get id)"; ICON="$(get icon)"; CROP="$(get icon_crop)"
 WIDTH="$(get page_width)"; WIDTH="${WIDTH:-1920}"
+DESKTOP_UA="$(get desktop_ua)"; DESKTOP_UA="${DESKTOP_UA:-false}"
 
 [ -n "$NAME" ] && [ ${#NAME} -le 50 ] || die "name: 1 to 50 characters"
 [[ "$URL" =~ ^https?://[^[:space:]\"\\]+$ ]] || die "url: must start with http:// or https://, no spaces or quotes"
 [[ "$ID" =~ ^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$ ]] \
   || die "id: like com.yourname.mysite (letters, digits, _, at least one dot); it must be unique per app"
 [[ "$WIDTH" =~ ^[0-9]+$ ]] && [ "$WIDTH" -ge 320 ] && [ "$WIDTH" -le 3840 ] || die "page_width: a number, 320 to 3840"
+[[ "$DESKTOP_UA" =~ ^(true|false)$ ]] || die "desktop_ua: true or false"
 [ -z "$ICON" ] || [ -f "$ICON" ] || die "icon: $ICON not found"
 [ -z "$CROP" ] || [[ "$CROP" =~ ^[0-9]+\ +[0-9]+\ +[0-9]+$ ]] || die "icon_crop: three numbers, x y size"
 
@@ -43,6 +45,7 @@ package app.webtv;
 final class Config {
     static final String URL = "$URL";
     static final int PAGE_WIDTH = $WIDTH;
+    static final boolean DESKTOP_UA = $DESKTOP_UA;
 }
 EOF
 # Android string resource: XML-escape, then backslash-escape quotes and a leading @ or ?.
