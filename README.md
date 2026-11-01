@@ -14,7 +14,7 @@ screen and sits on your TV's app shelf like any other app. Build as many as you 
   desktop page at the TV's real resolution.
 - **Ad blocking:**
   - Requests to about 275,000 known ad and tracker domains are refused.
-  - Pop-up windows and new tabs never open.
+  - Pop-up windows and new tabs never open, unless you ask for one with the Options button.
   - A page that tries to redirect you to an ad site stays where it is.
   - Leftover empty ad boxes are hidden.
   - The lists update themselves weekly.
@@ -120,6 +120,7 @@ The app now appears in the TV's app list. Pin it to the home row from there.
 | --- | --- |
 | Arrows | Move the pointer. Hold to speed up. At the top or bottom edge, scroll the page. |
 | OK | Click under the pointer |
+| Options | Click under the pointer, and open the link even if it wants a new tab. Back returns. |
 | Back | Go back a page, or leave full-screen video |
 | Hold Back (1 s) | Go to the home page and forget history |
 | Play/pause and other media keys | Passed to the page |
@@ -160,7 +161,7 @@ Limits:
 - **Ads served from the site's own domain** can't be blocked by domain without breaking the site itself.
 - **Cosmetic hiding** uses only EasyList's site-independent rules. Site-specific rules aren't supported, so some empty
   boxes stay. Ads can flash for a moment before they're hidden.
-- **No new windows at all:** sites that sign you in through a pop-up window (some "Sign in with…" buttons) won't work.
+- **No new windows at all:** a pop-up opens only from Options, and in place of the current page. Sites that sign you in through a pop-up window (some "Sign in with…" buttons) won't work.
 - **New ad domains** appear daily. The weekly update keeps up with most of them, not all.
 - **Video ads inside players** (YouTube-style) aren't blocked.
 

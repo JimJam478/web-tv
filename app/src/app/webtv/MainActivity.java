@@ -36,7 +36,8 @@ import org.json.JSONObject;
 
 /**
  * Opens HOME full screen, signed in across launches, videos able to go full screen. Ads: ad/tracker hosts blocked,
- * pop-up windows and non-web links dropped, leftover ad boxes hidden. Holding Back goes home.
+ * pop-up windows (unless asked for with Options) and non-web links dropped, leftover ad boxes hidden. Holding Back
+ * goes home.
  */
 public class MainActivity extends Activity {
     private static final String HOME = Config.URL;
@@ -65,6 +66,7 @@ public class MainActivity extends Activity {
     private volatile String hideAds;   // script adding EasyList's hide rules to a page; null until loaded
     private Thread blocklistLoader;
     private boolean clearHistoryOnLoad;
+    private long popupAllowedUntil;   // uptime until which a pop-up may open: just after an Options press
 
     @Override
     protected void onCreate(Bundle state) {
@@ -129,21 +131,9 @@ public class MainActivity extends Activity {
                 return blockAds(req);
             }
 
-            /** A page leaving for an ad host or a non-web link (intent://, market://) stays put instead. */
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
-                Uri url = req.getUrl();
-                String scheme = url.getScheme();
-                if (!"http".equals(scheme) && !"https".equals(scheme)) {
-                    Log.d("WebTV", "blocked scheme " + scheme);
-                    return true;
-                }
-                // Lists not loaded yet: let it through, shouldInterceptRequest still empties it once they are.
-                if (blocklist != null && blocklist.blocks(url.getHost())) {
-                    Log.d("WebTV", "blocked nav " + url.getHost());
-                    return true;
-                }
-                return false;
+                return refused(req.getUrl());
             }
 
             @Override
@@ -172,8 +162,34 @@ public class MainActivity extends Activity {
         web.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onCreateWindow(WebView view, boolean dialog, boolean userGesture, Message resultMsg) {
-                Log.d("WebTV", "blocked popup");
-                return false;
+                if (SystemClock.uptimeMillis() > popupAllowedUntil) {
+                    Log.d("WebTV", "blocked popup");
+                    return false;
+                }
+                popupAllowedUntil = 0;
+                // A throwaway window that hands its first URL to the main page, so Back returns from it.
+                // ponytail: a pop-up that never navigates (window.open() then document.write) is never destroyed;
+                // one leaked WebView per such Options press. Destroy it on a timeout if that ever matters.
+                final WebView popup = new WebView(MainActivity.this);
+                popup.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
+                        if (!refused(req.getUrl())) {
+                            Log.d("WebTV", "popup opened " + req.getUrl());
+                            web.loadUrl(req.getUrl().toString());
+                        }
+                        web.post(new Runnable() {   // not inside its own callback
+                            @Override
+                            public void run() {
+                                popup.destroy();
+                            }
+                        });
+                        return true;
+                    }
+                });
+                ((WebView.WebViewTransport) resultMsg.obj).setWebView(popup);
+                resultMsg.sendToTarget();
+                return true;
             }
 
             @Override
@@ -206,7 +222,25 @@ public class MainActivity extends Activity {
         web.requestFocus();
     }
 
-    /** The remote's arrows move the cursor and OK clicks under it; every other key (Back, media keys) is unchanged. */
+    /** A page leaving for an ad host or a non-web link (intent://, market://) stays put instead. */
+    private boolean refused(Uri url) {
+        String scheme = url.getScheme();
+        if (!"http".equals(scheme) && !"https".equals(scheme)) {
+            Log.d("WebTV", "blocked scheme " + scheme);
+            return true;
+        }
+        // Lists not loaded yet: let it through, shouldInterceptRequest still empties it once they are.
+        if (blocklist != null && blocklist.blocks(url.getHost())) {
+            Log.d("WebTV", "blocked nav " + url.getHost());
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * The remote's arrows move the cursor and OK clicks under it. Options clicks too, and lets that click open its
+     * new-tab link. Every other key (Back, media keys) is unchanged.
+     */
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
         int dx = 0, dy = 0;
@@ -218,6 +252,12 @@ public class MainActivity extends Activity {
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
                 if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) tap();
+                return true;
+            case KeyEvent.KEYCODE_MENU:
+                if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) {
+                    popupAllowedUntil = SystemClock.uptimeMillis() + 1000;   // the page may open it a moment later
+                    tap();
+                }
                 return true;
             default:
                 return super.dispatchKeyEvent(e);
